@@ -12,8 +12,9 @@
 // The context base is `A` (arena.data()); functions that the decompiler showed
 // using in_EAX / unaff_ESI for the context take `A` explicitly.
 //
-// Cross-reference: _re/enc_src_compact.c (FUN_004203c0..FUN_00424dd0) and
-// memory/xextool-lzx-encoder-re.md for the function map and field offsets.
+// Derived from the original's encoder cluster (FUN_004203c0..FUN_00424dd0 in a
+// Ghidra decompile of XexTool v6.3). Verified byte-exact by compressing a 36 MB
+// Xbox 360 basefile and diffing against the original tool's `-c c` output.
 #include "lzx_encode.h"
 #include <cstring>
 #include <stdexcept>
