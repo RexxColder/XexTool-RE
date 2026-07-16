@@ -1,34 +1,39 @@
-# XexTool-RE - build the CLI and the GUI with MinGW g++ (C++17)
+# recomp-tool - Xbox 360 / PS2 Reverse Engineering CLI
+# Native Linux build (no Wine, no Python runtime)
 CXX      ?= g++
-CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -MMD -MP
+CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -MMD -MP -Isrc
 
-# Engine = every source except the CLI entry points and the GUI entry point.
-ENGINE_SRC := $(filter-out src/main.cpp src/selftest.cpp,$(wildcard src/*.cpp)) \
+# Engine sources (XexTool-RE)
+ENGINE_SRC := $(filter-out src/main.cpp src/selftest.cpp, $(wildcard src/*.cpp)) \
               $(wildcard src/crypto/*.cpp) $(wildcard src/compress/*.cpp)
-ENGINE_OBJ := $(ENGINE_SRC:.cpp=.o)
+# Remove sqlite3.c from ENGINE_SRC (it's C, not C++)
+ENGINE_SRC := $(filter-out src/sqlite3.c, $(ENGINE_SRC))
 
-CLI_OBJ := src/main.o src/selftest.o $(ENGINE_OBJ)
-GUI_OBJ := src/gui/gui.o $(ENGINE_OBJ)
-DEP     := $(CLI_OBJ:.o=.d) src/gui/gui.d
+# New modules
+NEW_SRC := src/ghidra_detect.cpp src/ghidra_plugins.cpp \
+           src/export_rexglue.cpp src/export_ps2recomp.cpp
 
-CLI := xextool-re.exe
-GUI := xextool-re-gui.exe
+ALL_SRC := $(ENGINE_SRC) $(NEW_SRC)
+ALL_OBJ := $(ALL_SRC:.cpp=.o) src/sqlite3.o
 
-all: $(CLI) $(GUI)
-cli: $(CLI)
-gui: $(GUI)
+CLI_OBJ := src/main.o $(ALL_OBJ)
+DEP     := $(CLI_OBJ:.o=.d)
+
+CLI := recomp-tool
+
+all: $(CLI)
 
 $(CLI): $(CLI_OBJ)
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-$(GUI): $(GUI_OBJ)
-	$(CXX) $(CXXFLAGS) -mwindows -o $@ $^ -lcomdlg32 -lshell32 -lole32
+	$(CXX) $(CXXFLAGS) -o $@ $^ -ldl -lpthread
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+src/sqlite3.o: src/sqlite3.c
+	gcc -O2 -Wall -DSQLITE_THREADSAFE=0 -c $< -o $@
+
 clean:
-	rm -f $(ENGINE_OBJ) src/main.o src/selftest.o src/gui/gui.o $(DEP) $(CLI) $(GUI)
+	rm -f $(ALL_OBJ) src/main.o src/selftest.o src/sqlite3.o $(DEP) $(CLI)
 
 -include $(DEP)
-.PHONY: all cli gui clean
+.PHONY: all clean
