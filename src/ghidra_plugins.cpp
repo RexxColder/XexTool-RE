@@ -11,14 +11,6 @@
 
 namespace fs = std::filesystem;
 
-const PluginInfo PLUGIN_EMOTIONENGINE = {
-    "Emotion Engine Reloaded",
-    "PS2 Emotion Engine processor + decompiler (MIPS R5900, VU0, COP0/1/2)",
-    "ghidra-emotionengine-reloaded.zip",
-    "https://github.com/chaoticgd/ghidra-emotionengine-reloaded/releases/latest",
-    "v2.1.36"
-};
-
 const PluginInfo PLUGIN_XEXLOADER = {
     "XEXLoaderWV",
     "Xbox 360 XEX file loader for Ghidra",
@@ -66,7 +58,6 @@ static std::string find_bundled_zip(const PluginInfo& plugin) {
     ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
     if (len <= 0) return "";
     exe_path[len] = '\0';
-
     fs::path bin_dir = fs::path(exe_path).parent_path();
     std::vector<fs::path> search = {
         bin_dir / "plugins" / plugin.zip_filename,
@@ -75,7 +66,6 @@ static std::string find_bundled_zip(const PluginInfo& plugin) {
         "/usr/share/recomp-tool/plugins" / fs::path(plugin.zip_filename),
         "/usr/local/share/recomp-tool/plugins" / fs::path(plugin.zip_filename),
     };
-
     for (auto& p : search) {
         if (fs::exists(p)) return p.string();
     }
@@ -84,8 +74,7 @@ static std::string find_bundled_zip(const PluginInfo& plugin) {
 
 static bool unzip_to(const std::string& zip_path, const std::string& dest_dir) {
     std::string cmd = "unzip -q -o \"" + zip_path + "\" -d \"" + dest_dir + "\" 2>&1";
-    int ret = system(cmd.c_str());
-    return ret == 0;
+    return system(cmd.c_str()) == 0;
 }
 
 bool install_plugin(const GhidraInfo& ghidra, const PluginInfo& plugin) {
@@ -94,56 +83,43 @@ bool install_plugin(const GhidraInfo& ghidra, const PluginInfo& plugin) {
         std::cerr << "  ERROR: Cannot find Ghidra Extensions directory\n";
         return false;
     }
-
     fs::create_directories(ext_dir);
-
     std::string zip_path = find_bundled_zip(plugin);
-
     if (zip_path.empty()) {
         std::cout << "  Plugin not bundled, downloading from GitHub...\n";
-        std::string download_cmd = "curl -sL \"" + plugin.download_url + "\" -o /tmp/" + plugin.zip_filename;
-        int ret = system(download_cmd.c_str());
-        if (ret == 0 && fs::exists("/tmp/" + plugin.zip_filename)) {
+        std::string dl = "curl -sL \"" + plugin.download_url + "\" -o /tmp/" + plugin.zip_filename;
+        if (system(dl.c_str()) == 0 && fs::exists("/tmp/" + plugin.zip_filename))
             zip_path = "/tmp/" + plugin.zip_filename;
-        }
     }
-
     if (zip_path.empty()) {
         std::cerr << "  ERROR: Plugin ZIP not found: " << plugin.zip_filename << "\n";
-        std::cerr << "  Download from: " << plugin.download_url << "\n";
-        std::cerr << "  Place in: plugins/" << plugin.zip_filename << "\n";
+        std::cerr << "  Download: " << plugin.download_url << "\n";
         return false;
     }
-
-    std::cout << "  Installing " << plugin.name << " from " << fs::path(zip_path).filename().string() << "...\n";
+    std::cout << "  Installing " << plugin.name << "...\n";
     if (!unzip_to(zip_path, ext_dir)) {
-        std::cerr << "  ERROR: Failed to extract plugin ZIP\n";
+        std::cerr << "  ERROR: Failed to extract\n";
         return false;
     }
-
-    std::cout << "  Plugin installed successfully\n";
+    std::cout << "  OK\n";
     return true;
 }
 
 bool check_and_install_all(const GhidraInfo& ghidra) {
+    std::vector<PluginInfo> plugins = {PLUGIN_XEXLOADER};
     bool all_ok = true;
-
-    std::vector<PluginInfo> plugins = {PLUGIN_EMOTIONENGINE, PLUGIN_XEXLOADER};
-
     for (auto& plugin : plugins) {
         if (check_plugin_installed(ghidra, plugin)) {
-            std::cout << "  " << plugin.name << ": OK (installed)\n";
+            std::cout << "  " << plugin.name << ": OK\n";
         } else {
             std::cout << "  " << plugin.name << ": NOT FOUND\n";
             std::cout << "  Install " << plugin.name << "? (" << plugin.description << ") [Y/n] ";
             std::string answer;
             std::getline(std::cin, answer);
             if (answer.empty() || answer[0] == 'y' || answer[0] == 'Y') {
-                if (!install_plugin(ghidra, plugin)) {
-                    all_ok = false;
-                }
+                if (!install_plugin(ghidra, plugin)) all_ok = false;
             } else {
-                std::cout << "  Skipped " << plugin.name << "\n";
+                std::cout << "  Skipped\n";
                 all_ok = false;
             }
         }
